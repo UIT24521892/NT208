@@ -1,9 +1,27 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { TrendingDown } from 'lucide-react';
 import { PieChart, Pie, Cell } from 'recharts';
 import { AISupportWidget } from '../components/AISupportWidget';
+import { supabase } from '../lib/supabase'; // Cổng kết nối Database
 
 export const Dashboard = () => {
+  // State lưu dữ liệu sinh viên từ DB
+  const [riskStudents, setRiskStudents] = useState<any[]>([]);
+
+  // Lấy dữ liệu từ Supabase khi mở trang
+  useEffect(() => {
+    async function fetchRiskStudents() {
+      const { data } = await supabase
+        .from('students')
+        .select('*')
+        .limit(3); // Lấy 3 sinh viên làm ví dụ cho bảng Red Flags
+      
+      if (data) setRiskStudents(data);
+    }
+    fetchRiskStudents();
+  }, []);
+
+  // Dữ liệu cho biểu đồ (giữ nguyên đồ họa đẹp)
   const chartData = [
     { name: 'Excellent', value: 45, color: '#004ac6' },
     { name: 'Good', value: 30, color: '#2563eb' },
@@ -19,6 +37,8 @@ export const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-12 gap-8">
+        
+        {/* BẢNG RED FLAGS (ĐÃ KẾT NỐI DATABASE) */}
         <section className="col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -39,30 +59,48 @@ export const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {[
-                  { initials: 'EJ', name: 'Elena Jenkins', id: '#2948-AD', drop: '-0.85', debt: '12 CR', color: 'error', bg: 'bg-blue-50', text: 'text-blue-600' },
-                  { initials: 'MM', name: 'Marcus Miller', id: '#3102-BC', drop: '-0.42', debt: '4 CR', color: 'orange', bg: 'bg-slate-50', text: 'text-slate-600' },
-                  { initials: 'ST', name: 'Sarah Tish', id: '#1185-FX', drop: '-1.20', debt: '18 CR', color: 'error', bg: 'bg-blue-50', text: 'text-blue-600' },
-                ].map((s, i) => (
-                  <tr key={i} className="group hover:bg-surface-container-low/50 transition-colors cursor-pointer">
-                    <td className="py-4 font-semibold text-on-surface flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full ${s.bg} flex items-center justify-center ${s.text} font-bold text-xs shadow-sm`}>{s.initials}</div>
-                      {s.name}
-                    </td>
-                    <td className="py-4 text-slate-500 font-mono text-xs">{s.id}</td>
-                    <td className="py-4">
-                      <span className={`inline-flex items-center px-2 py-1 ${s.color === 'error' ? 'bg-error-container/50 text-error' : 'bg-orange-100/50 text-orange-700'} rounded-full text-[10px] font-bold`}>
-                        {s.drop} <TrendingDown className="w-3 h-3 ml-1" />
-                      </span>
-                    </td>
-                    <td className={`py-4 text-right font-mono ${s.color === 'error' ? 'text-error' : 'text-orange-600'} font-bold`}>{s.debt}</td>
-                  </tr>
-                ))}
+                {riskStudents.length === 0 ? (
+                  <tr><td colSpan={4} className="py-8 text-center text-slate-400">Loading Database...</td></tr>
+                ) : (
+                  riskStudents.map((s, i) => {
+                    // Trích xuất 2 chữ cái đầu của tên (Ví dụ: Nguyễn Văn A -> NA)
+                    const names = s.full_name.split(' ');
+                    const initials = names.length > 1 ? `${names[0][0]}${names[names.length-1][0]}` : names[0][0];
+                    
+                    // Thêm dữ liệu giả lập (mock) cho màu sắc và chỉ số rủi ro để UI vẫn đẹp như cũ
+                    const drops = ['-0.85', '-0.42', '-1.20'];
+                    const debts = ['12 CR', '4 CR', '18 CR'];
+                    const colors = ['error', 'orange', 'error'];
+                    const bgs = ['bg-blue-50', 'bg-slate-50', 'bg-blue-50'];
+                    const texts = ['text-blue-600', 'text-slate-600', 'text-blue-600'];
+
+                    return (
+                      <tr key={s.id} className="group hover:bg-surface-container-low/50 transition-colors cursor-pointer">
+                        <td className="py-4 font-semibold text-on-surface flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full ${bgs[i%3]} flex items-center justify-center ${texts[i%3]} font-bold text-xs shadow-sm uppercase`}>
+                            {initials}
+                          </div>
+                          {s.full_name}
+                        </td>
+                        <td className="py-4 text-slate-500 font-mono text-xs">{s.mssv}</td>
+                        <td className="py-4">
+                          <span className={`inline-flex items-center px-2 py-1 ${colors[i%3] === 'error' ? 'bg-error-container/50 text-error' : 'bg-orange-100/50 text-orange-700'} rounded-full text-[10px] font-bold`}>
+                            {drops[i%3]} <TrendingDown className="w-3 h-3 ml-1" />
+                          </span>
+                        </td>
+                        <td className={`py-4 text-right font-mono ${colors[i%3] === 'error' ? 'text-error' : 'text-orange-600'} font-bold`}>
+                          {debts[i%3]}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
         </section>
 
+        {/* BIỂU ĐỒ TRÒN (PIE CHART) */}
         <section className="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 flex flex-col">
           <div className="mb-6">
             <h3 className="text-xl font-headline font-bold text-blue-900">Performance Distribution</h3>
@@ -105,6 +143,7 @@ export const Dashboard = () => {
           </div>
         </section>
 
+        {/* MÔN HỌC ĐIỂM LIỆT (KILLER SUBJECTS) */}
         <section className="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
           <div className="mb-10">
             <h3 className="text-xl font-headline font-bold text-blue-900">Killer Subjects</h3>
@@ -133,6 +172,8 @@ export const Dashboard = () => {
           </div>
         </section>
       </div>
+      
+      {/* Widget AI */}
       <AISupportWidget />
     </div>
   );
